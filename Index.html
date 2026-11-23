@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#123b32">
+<title>Polycon Attendance</title>
+<style>
+:root{--green:#123b32;--mint:#e9f4ef;--ink:#17231f;--muted:#65736d;--line:#dce6e0;--bg:#f4f7f5}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,sans-serif}
+header{background:var(--green);color:white;padding:24px 18px 28px;border-radius:0 0 24px 24px}
+header small{opacity:.8;letter-spacing:.08em}h1{font-size:24px;margin:8px 0 4px}header p{margin:0;opacity:.85;font-size:14px}
+main{max-width:680px;margin:0 auto;padding:16px}
+.card{background:white;border:1px solid var(--line);border-radius:18px;padding:17px;margin:0 0 14px;box-shadow:0 4px 16px #14251c08}
+h2{font-size:17px;margin:0 0 14px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
+input,select,textarea{width:100%;border:1px solid var(--line);border-radius:11px;padding:12px;font-size:16px;background:white;color:var(--ink)}
+textarea{min-height:72px;resize:vertical}.field{margin-bottom:12px}
+button{border:0;border-radius:12px;padding:13px 15px;font-size:15px;font-weight:700;cursor:pointer}
+.primary{background:var(--green);color:white;width:100%}.secondary{background:var(--mint);color:var(--green)}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.note{font-size:12px;color:var(--muted);line-height:1.5;margin:10px 0 0}
+.entry{border:1px solid var(--line);border-radius:13px;padding:12px;margin-top:10px}
+.entrytop{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.entry strong{font-size:14px}.entry p{margin:7px 0 0;font-size:13px;color:var(--muted);line-height:1.5}
+.pill{font-size:11px;background:var(--mint);color:var(--green);padding:5px 8px;border-radius:20px;white-space:nowrap}
+.empty{color:var(--muted);font-size:14px;text-align:center;padding:18px 0}
+footer{text-align:center;color:var(--muted);font-size:11px;padding:8px 0 24px}
+@media(max-width:420px){.grid{grid-template-columns:1fr 1fr}main{padding:12px}}
+</style>
+</head>
+<body>
+<header>
+ <small>PERSONAL ATTENDANCE TRACKER</small>
+ <h1>Polycon Attendance</h1>
+ <p>Polycon International Ltd.</p>
+</header>
+<main>
+ <section class="card">
+  <h2>आज की हाजिरी दर्ज करें</h2>
+  <div class="field"><label for="date">तारीख</label><input id="date" type="date"></div>
+  <div class="field"><label for="shift">ड्यूटी शिफ्ट</label><select id="shift"><option>Day Shift</option><option>Night Shift</option><option>Other / Extra Duty</option></select></div>
+  <div class="grid">
+   <div class="field"><label for="tin">आने का समय (IN)</label><input id="tin" type="time" value="08:00"></div>
+   <div class="field"><label for="tout">जाने का समय (OUT)</label><input id="tout" type="time" value="20:00"></div>
+  </div>
+  <div class="grid">
+   <div class="field"><label for="late">लेट आने का समय</label><input id="late" type="text" placeholder="जैसे 20 मिनट"></div>
+   <div class="field"><label for="early">जल्दी जाने का समय</label><input id="early" type="text" placeholder="जैसे 30 मिनट"></div>
+  </div>
+  <div class="field"><label for="remark">नोट (छुट्टी, ओवरटाइम आदि)</label><textarea id="remark" placeholder="यहाँ कुछ लिखें..."></textarea></div>
+  <button class="primary" id="save">हाजिरी सेव करें</button>
+  <p class="note">रात की ड्यूटी के लिए भी IN और OUT का समय चुनें। तारीख ड्यूटी शुरू होने वाले दिन की रखें।</p>
+ </section>
+ <section class="card">
+  <h2>हाजिरी का रिकॉर्ड</h2>
+  <div class="actions">
+   <button class="secondary" id="export">Excel/CSV डाउनलोड</button>
+   <button class="secondary" id="clear">सभी रिकॉर्ड हटाएँ</button>
+  </div>
+  <div id="records"></div>
+ </section>
+ <footer>यह रिकॉर्ड इसी फोन/ब्राउज़र में सेव रहता है। ब्राउज़र का डेटा साफ करने या फोन बदलने पर रिकॉर्ड मिट सकता है—समय-समय पर CSV डाउनलोड करें।</footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const KEY='polycon_attendance_v1';
+const SHEET_URL='https://script.google.com/macros/s/AKfycbyJEexG0OI5thKzug4y4kQrD9A8MJNg5QNDl_gj4A0vxEFY1IVLLwlSvvKyxuMj6YPL/exec';
+let records=[];
+try{records=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){records=[]}
+$('date').value=new Date().toLocaleDateString('en-CA');
+function persist(){localStorage.setItem(KEY,JSON.stringify(records));render()}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function render(){
+ const root=$('records');
+ if(!records.length){root.innerHTML='<div class="empty">अभी कोई रिकॉर्ड सेव नहीं है।</div>';return}
+ root.innerHTML=[...records].sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`
+ <div class="entry"><div class="entrytop"><strong>${esc(r.date)} · ${esc(r.shift)}</strong><span class="pill">${esc(r.tin)} → ${esc(r.tout)}</span></div>
+ <p>लेट: ${esc(r.late||'नहीं')} · जल्दी गए: ${esc(r.early||'नहीं')}<br>${esc(r.remark||'कोई नोट नहीं')}</p>
+ <div style="text-align:right;margin-top:8px"><button class="secondary" data-del="${esc(r.id)}">हटाएँ</button></div></div>`).join('');
+ root.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>{records=records.filter(r=>r.id!==b.dataset.del);persist()}));
+}
+$('save').addEventListener('click',()=>{
+ const date=$('date').value, tin=$('tin').value, tout=$('tout').value;
+ if(!date||!tin||!tout){alert('तारीख, IN और OUT समय भरें।');return}
+ const item={id:String(Date.now()),date,shift:$('shift').value,tin,tout,late:$('late').value.trim(),early:$('early').value.trim(),remark:$('remark').value.trim()};
+ const idx=records.findIndex(r=>r.date===date&&r.shift===item.shift);
+ if(idx>=0){if(!confirm('इस तारीख और शिफ्ट का रिकॉर्ड पहले से है। क्या उसे बदलना है?'))return;records[idx]=item}else records.push(item);
+ persist();
+ $('late').value='';$('early').value='';$('remark').value='';
+ fetch(SHEET_URL, {
+   method:'POST',
+   mode:'no-cors',
+   headers:{'Content-Type':'text/plain;charset=utf-8'},
+   body:JSON.stringify(item)
+ }).then(()=>alert('हाजिरी फोन में सेव हो गई। Google Sheet में एंट्री भेज दी गई है।'))
+   .catch(()=>alert('हाजिरी फोन में सेव है, लेकिन Google Sheet को भेजने में दिक्कत हुई। इंटरनेट और Apps Script deployment जाँचें।'));
+});
+$('export').addEventListener('click',()=>{
+ if(!records.length){alert('डाउनलोड करने के लिए रिकॉर्ड नहीं है।');return}
+ const rows=[['Company','Polycon International Ltd.'],['Date','Shift','Time IN','Time OUT','Late','Early Leave','Remarks'],...records.map(r=>[r.date,r.shift,r.tin,r.tout,r.late,r.early,r.remark])];
+ const csv=rows.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
+ const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'});
+ const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Polycon_Attendance.csv';a.click();URL.revokeObjectURL(a.href);
+});
+$('clear').addEventListener('click',()=>{if(confirm('क्या आप सच में सभी हाजिरी रिकॉर्ड हटाना चाहते हैं?')){records=[];persist()}});
+render();
+</script>
+</body>
+</html>
